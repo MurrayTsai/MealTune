@@ -18,23 +18,31 @@
      if (meals.length > 0) {
        recordDays++;
        let dayCal = 0;
+       let dayPro = 0, dayCarbs = 0, dayFat = 0;
        for (const meal of meals) {
          if (meal.foods) {
            for (const food of meal.foods) {
              dayCal += food.calories || 0;
-             totalProtein += food.protein || 0;
-             totalCarbs += food.carbs || 0;
-             totalFat += food.fat || 0;
+             dayPro += food.protein || 0;
+             dayCarbs += food.carbs || 0;
+             dayFat += food.fat || 0;
            }
          }
        }
-       totalCalories += dayCal;
-       if (dayCal > 0) daysWithFood++;
+       if (dayCal > 0) {
+         daysWithFood++;
+         totalCalories += dayCal;
+         totalProtein += dayPro;
+         totalCarbs += dayCarbs;
+         totalFat += dayFat;
+       }
      }
    }
  
-   const avgCal = daysWithFood > 0 ? Math.round(totalCalories / daysWithFood) : 0;
-   const avgPro = daysWithFood > 0 ? Math.round(totalProtein / daysWithFood) : 0;
+  const avgCal = daysWithFood > 0 ? Math.round(totalCalories / daysWithFood) : 0;
+  const avgPro = daysWithFood > 0 ? Math.round(totalProtein / daysWithFood) : 0;
+  const avgCarbs = daysWithFood > 0 ? Math.round(totalCarbs / daysWithFood) : 0;
+  const avgFat = daysWithFood > 0 ? Math.round(totalFat / daysWithFood) : 0;
  
    // Weight comparison: first week vs last week
    const weightRecords = await getWeightRecords(30);
@@ -93,11 +101,16 @@
        </div>
        <div class="card">
          <div class="card-header">饮食对比</div>
-         <div class="stat-row">
-           <div class="stat-item"><div class="stat-value">${avgCal}</div><div class="stat-label">日均热量</div></div>
-           <div class="stat-item"><div class="stat-value">${avgPro}g</div><div class="stat-label">日均蛋白质</div></div>
-           <div class="stat-item"><div class="stat-value">${plan?.calories || '-'}</div><div class="stat-label">目标</div></div>
-         </div>
+        <div class="stat-row">
+          <div class="stat-item"><div class="stat-value">${avgCal}</div><div class="stat-label">日均热量</div></div>
+          <div class="stat-item"><div class="stat-value">${avgPro}g</div><div class="stat-label">日均蛋白质</div></div>
+          <div class="stat-item"><div class="stat-value">${plan?.calories || '-'}</div><div class="stat-label">目标</div></div>
+        </div>
+        <div class="stat-row" style="margin-top:6px;">
+          <div class="stat-item"><div class="stat-value">${avgCarbs}g</div><div class="stat-label">日均碳水</div></div>
+          <div class="stat-item"><div class="stat-value">${avgFat}g</div><div class="stat-label">日均脂肪</div></div>
+          <div class="stat-item"><div class="stat-value">${avgPro}g</div><div class="stat-label">日均蛋白质</div></div>
+        </div>
        </div>
        ${avgFirst > 0 ? `
        <div class="card">

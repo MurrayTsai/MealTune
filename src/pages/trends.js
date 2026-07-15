@@ -83,7 +83,17 @@
    const last = records[records.length - 1].weight;
    const change = last - first;
    const changeStr = change >= 0 ? `+${change.toFixed(1)}` : change.toFixed(1);
- 
+
+   // Calculate 7-day moving average
+   const movingAvgData = data.map((_, i) => {
+     const windowSize = Math.min(7, i + 1);
+     let sum = 0;
+     for (let j = i - windowSize + 1; j <= i; j++) {
+       sum += data[j];
+     }
+     return Math.round((sum / windowSize) * 10) / 10;
+   });
+
    if (summary) {
      summary.innerHTML = `
        <div class="stat-row">
@@ -107,21 +117,34 @@
      type: 'line',
      data: {
        labels,
-       datasets: [{
-         label: '体重 (kg)',
-         data,
-         borderColor: '#4F7C3F',
-         backgroundColor: 'rgba(79,124,63,0.1)',
-         fill: true,
-         tension: 0.3,
-         pointRadius: 4,
-         pointBackgroundColor: '#4F7C3F',
-       }]
+       datasets: [
+         {
+           label: '体重 (kg)',
+           data,
+           borderColor: '#4F7C3F',
+           backgroundColor: 'rgba(79,124,63,0.1)',
+           fill: true,
+           tension: 0.3,
+           pointRadius: 4,
+           pointBackgroundColor: '#4F7C3F',
+         },
+         {
+           label: '7日均线 (kg)',
+           data: movingAvgData,
+           borderColor: '#F59E0B',
+           backgroundColor: 'transparent',
+           fill: false,
+           tension: 0.4,
+           pointRadius: 0,
+           borderWidth: 2,
+           borderDash: [6, 3],
+         }
+       ]
      },
      options: {
        responsive: true,
        maintainAspectRatio: false,
-       plugins: { legend: { display: false } },
+       plugins: { legend: { display: true, position: 'top', labels: { font: { size: 11 }, boxWidth: 12 } } },
        scales: {
          y: {
            ticks: { callback: v => v + 'kg', font: { size: 11 } },

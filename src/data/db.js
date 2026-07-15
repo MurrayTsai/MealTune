@@ -13,6 +13,19 @@
    monthlyReviews: '++id, monthStart',
    aiMealLogs: '++id, createdAt'
  });
+
+ db.version(2).stores({
+   userProfile: '++id, onboardingCompleted',
+   nutritionPlan: '++id, createdAt, planType, status',
+   mealRecords: '++id, date, mealType, [date+mealType]',
+   weightRecords: '++id, date',
+   exerciseRecords: '++id, date',
+   dailySummaries: '++id, date',
+   weeklyReviews: '++id, weekStart',
+   monthlyReviews: '++id, monthStart',
+   aiMealLogs: '++id, createdAt',
+   waterRecords: '++id, date'
+ });
  
  export async function getUserProfile() {
    const profiles = await db.userProfile.toArray();
@@ -114,6 +127,19 @@
      return existing;
    }
    return await db.monthlyReviews.add(review);
+ }
+
+ export async function getWaterRecord(date) {
+   return await db.waterRecords.where('date').equals(date).first();
+ }
+
+ export async function saveWaterRecord(date, amount) {
+   const existing = await getWaterRecord(date);
+   if (existing) {
+     await db.waterRecords.update(existing.id, { amount, updatedAt: new Date().toISOString() });
+     return existing;
+   }
+   return await db.waterRecords.add({ date, amount, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
  }
  
  export default db;

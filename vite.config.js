@@ -1,8 +1,6 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: '/MealTune/',
-
   root: '.',
   publicDir: 'public',
 
@@ -12,7 +10,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html'
-      }
+}
     }
   },
 

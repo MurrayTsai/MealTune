@@ -1,8 +1,8 @@
- import { getUserProfile, getNutritionPlan, getMealRecords, saveWeightRecord, getWeightRecords } from '../data/db.js';
+ import { getUserProfile, getNutritionPlan, getMealRecords, saveWeightRecord, getWeightRecords, getWaterRecord, saveWaterRecord } from '../data/db.js';
  import { today, formatDate, calculateMealTotals, generateInsight } from '../utils/nutrition.js';
  import { generateRecommendation, parseMealText } from '../utils/aiService.js';
  import { pageWrapper, navigate } from '../router.js';
- import { showToast } from '../components/shared.js';
+ import { showToast, showModal } from '../components/shared.js';
 
  export async function render() {
    const profile = await getUserProfile();
@@ -14,7 +14,6 @@
    const plan = await getNutritionPlan();
    const date = today();
    const meals = await getMealRecords(date);
-   const yesterdayMeals = await getMealRecords(getYesterday());
    const weightRecords = await getWeightRecords(7);
 
    // Calculate consumed totals
@@ -213,33 +212,42 @@
    if (weightDisplay) {
      weightDisplay.style.cursor = 'pointer';
      weightDisplay.onclick = async () => {
-       const { showModal } = await import('../components/shared.js');
-       const { default: modal } = await import('../components/shared.js');
-       const weight = prompt('记录今日体重 (kg):', latestWeight?.weight || profile.currentWeight);
-       if (weight && parseFloat(weight) > 0) {
-         await saveWeightRecord({ date, weight: parseFloat(weight) });
-         showToast('体重已记录', 'success');
-         render();
+       const currentVal = latestWeight?.weight || profile.currentWeight;
+       const confirmed = await showModal('记录体重', `
+         <div style="margin:12px 0;">
+           <label style="font-size:0.875rem;color:var(--text-secondary);">今日体重 (kg)</label>
+           <input class="form-input" id="weight-input" type="number" step="0.1" value="${currentVal}" min="20" max="300" style="margin-top:6px;" />
+         </div>
+       `, '保存', '取消');
+       if (confirmed) {
+         const input = document.getElementById('weight-input');
+         const weight = input ? parseFloat(input.value) : NaN;
+         if (weight > 0) {
+           await saveWeightRecord({ date, weight });
+           showToast('体重已记录', 'success');
+           render();
+         } else {
+           showToast('请输入有效体重', 'warning');
+         }
        }
      };
    }
  }
 
  let waterIntake = 0;
- function setupWaterTracker(target) {
-   const stored = localStorage.getItem(`water_${today()}`);
-   waterIntake = stored ? parseInt(stored) : 0;
+ let waterTarget = 2000;
+ async function setupWaterTracker(target) {
+   waterTarget = target;
+   const record = await getWaterRecord(today());
+   waterIntake = record ? record.amount : 0;
    updateWaterDisplay(target);
  }
 
- window.adjustWater = (amount) => {
+ window.adjustWater = async (amount) => {
    const date = today();
-   const key = `water_${date}`;
    waterIntake = Math.max(0, waterIntake + amount);
-   localStorage.setItem(key, waterIntake.toString());
-   const plan = localStorage.getItem('mealtune_current_plan');
-   const target = plan ? JSON.parse(plan).waterTarget : 2000;
-   updateWaterDisplay(target);
+   await saveWaterRecord(date, waterIntake);
+   updateWaterDisplay(waterTarget);
  };
 
  function updateWaterDisplay(target) {
@@ -247,12 +255,6 @@
    const barEl = document.getElementById('water-bar');
    if (amountEl) amountEl.textContent = `${waterIntake} ml`;
    if (barEl) barEl.style.width = `${Math.min(100, (waterIntake / target) * 100)}%`;
- }
-
- function getYesterday() {
-   const d = new Date();
-   d.setDate(d.getDate() - 1);
-   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
  }
 
  export default { render };

@@ -2,19 +2,18 @@
  import { navigate, pageWrapper } from '../router.js';
  import { PLAN_TYPES, ACTIVITY_LABELS, calculateStageTarget, getExerciseRecommendation } from '../utils/nutrition.js';
  import { showToast, showModal } from '../components/shared.js';
- import { clearAIConfig, getAIConfig } from '../utils/aiService.js';
+ 
  
  export async function render() {
    const profile = await getUserProfile();
    const plan = await getNutritionPlan();
-   if (!profile) { navigate('/onboarding'); return; }
+   if (!profile || !profile.onboardingCompleted) { navigate('/onboarding'); return; }
  
    const stage = calculateStageTarget(profile.currentWeight, profile.targetWeight);
    const planLabel = PLAN_TYPES[profile.planType]?.label || '';
    const activityLabel = ACTIVITY_LABELS[profile.activityLevel] || '';
    const exercise = getExerciseRecommendation(profile.planType);
-   const aiConfig = getAIConfig();
- 
+  
    const content = `
      <div class="fade-in">
        <!-- Profile Summary -->
@@ -78,9 +77,9 @@
            <span>🥜 饮食忌口与过敏</span>
            <span class="text-muted">›</span>
          </div>
-         <div class="menu-item" onclick="showAIConfig()">
-           <span>🤖 AI 配置</span>
-           <span class="text-muted">${aiConfig ? '已配置' : '未配置'}</span>
+         <div class="menu-item" onclick="exportData()">
+           <span>📤 导出数据</span>
+           <span class="text-muted">›</span>
          </div>
          <div class="menu-item" onclick="window.navigate('/me/data-info')">
            <span>ℹ️ 数据说明</span>
@@ -106,54 +105,8 @@
      .menu-item:hover { background:var(--bg); }
    `;
    app?.appendChild(style);
- 
-  window.showAIConfig = () => {
-    const config = getAIConfig();
-     const apiKey = config?.apiKey || '';
-     const endpoint = config?.endpoint || 'https://api.openai.com/v1/chat/completions';
-     const model = config?.model || 'gpt-4o-mini';
- 
-     const modal = document.createElement('div');
-     modal.className = 'modal-overlay';
-     modal.innerHTML = `
-       <div class="modal-content">
-         <div class="modal-title">AI 配置</div>
-         <div class="modal-body">
-           <div class="form-group">
-             <label class="form-label">API Key</label>
-             <input class="form-input" id="ai-api-key" type="password" value="${apiKey}" placeholder="sk-..." />
-           </div>
-           <div class="form-group">
-             <label class="form-label">API 地址 <span class="hint">(可选)</span></label>
-             <input class="form-input" id="ai-endpoint" value="${endpoint}" placeholder="https://api.openai.com/v1/chat/completions" />
-           </div>
-           <div class="form-group">
-             <label class="form-label">模型 <span class="hint">(可选)</span></label>
-             <input class="form-input" id="ai-model" value="${model}" placeholder="gpt-4o-mini" />
-           </div>
-         </div>
-         <div class="modal-actions">
-           <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">取消</button>
-           <button class="btn btn-primary" onclick="saveAIConfigFromModal()">保存</button>
-         </div>
-       </div>
-     `;
-     document.body.appendChild(modal);
-   };
 
-  window.saveAIConfigFromModal = () => {
-     import("../utils/aiService.js").then(m => {
-       m.saveAIConfig({
-         apiKey: document.getElementById("ai-api-key").value,
-         endpoint: document.getElementById("ai-endpoint").value,
-         model: document.getElementById("ai-model").value
-       });
-       showToast("AI配置已保存", "success");
-       document.querySelectorAll(".modal-overlay").forEach(e => e.remove());
-     });
-  };
- 
-   window.resetAllData = async () => {
+window.resetAllData = async () => {
      const confirm = await showModal('⚠️ 危险操作', '这将清除所有数据（个人资料、饮食记录、体重数据），且无法恢复。确定要继续吗？', '我已确认，重置', '取消');
      if (confirm) {
        await import('../data/db.js').then(m => {
@@ -165,10 +118,36 @@
        });
      }
    };
+
+   window.exportData = async () => {
+     const dbModule = await import('../data/db.js');
+     const db = dbModule.default;
+     const data = {
+       exportDate: new Date().toISOString(),
+       userProfile: await db.userProfile.toArray(),
+       nutritionPlan: await db.nutritionPlan.toArray(),
+       mealRecords: await db.mealRecords.toArray(),
+       weightRecords: await db.weightRecords.toArray(),
+       exerciseRecords: await db.exerciseRecords.toArray(),
+       dailySummaries: await db.dailySummaries.toArray(),
+       weeklyReviews: await db.weeklyReviews.toArray(),
+       monthlyReviews: await db.monthlyReviews.toArray(),
+       waterRecords: await db.waterRecords.toArray ? await db.waterRecords.toArray() : [],
+     };
+     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+     const url = URL.createObjectURL(blob);
+     const a = document.createElement('a');
+     a.href = url;
+     a.download = `mealtune-backup-${new Date().toISOString().split('T')[0]}.json`;
+     a.click();
+     URL.revokeObjectURL(url);
+     showToast('数据已导出', 'success');
+   };
  }
  
  export async function renderPlan() {
    const profile = await getUserProfile();
+   if (!profile || !profile.onboardingCompleted) { navigate('/onboarding'); return; }
    const plan = await getNutritionPlan();
    const planLabel = PLAN_TYPES[profile?.planType]?.label || '';
    const stage = calculateStageTarget(profile?.currentWeight || 70, profile?.targetWeight || 65);
@@ -213,7 +192,7 @@
  
  export async function renderProfile() {
    const profile = await getUserProfile();
-   if (!profile) { navigate('/onboarding'); return; }
+   if (!profile || !profile.onboardingCompleted) { navigate('/onboarding'); return; }
  
    const content = `
      <div class="fade-in">
@@ -293,6 +272,7 @@
  
  export async function renderRestrictions() {
    const profile = await getUserProfile();
+   if (!profile || !profile.onboardingCompleted) { navigate('/onboarding'); return; }
    const restrictions = profile?.restrictions || [];
    const allergies = profile?.allergies || [];
  
@@ -355,6 +335,8 @@
  }
  
  export async function renderDataInfo() {
+   const profile = await getUserProfile();
+   if (!profile || !profile.onboardingCompleted) { navigate('/onboarding'); return; }
    const content = `
      <div class="fade-in">
        <div class="card">

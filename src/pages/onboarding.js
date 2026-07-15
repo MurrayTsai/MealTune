@@ -62,11 +62,11 @@
        } else {
          btn.classList.toggle('selected');
        }
-       btn.classList.add('selected');
-       if (btn.dataset.onselect) {
-         eval(btn.dataset.onselect);
-       }
-     });
+      btn.classList.add('selected');
+      if (name && value && name in state) {
+        state[name] = value;
+      }
+    });
    });
  
    const nextBtn = app.querySelector('.btn-next');
@@ -86,6 +86,27 @@
      });
    }
  
+   // Bind health limitation buttons (step 5)
+   const hlYes = app.querySelector('#hl-yes');
+   const hlNo = app.querySelector('#hl-no');
+   const hlOther = app.querySelector('#hl-other');
+   if (hlYes) {
+     hlYes.addEventListener('click', () => {
+       state.hasHealthLimitation = true;
+       hlYes.className = 'btn btn-sm btn-primary';
+       hlNo.className = 'btn btn-sm btn-secondary';
+       if (hlOther) hlOther.classList.remove('hidden');
+     });
+   }
+   if (hlNo) {
+     hlNo.addEventListener('click', () => {
+       state.hasHealthLimitation = false;
+       hlNo.className = 'btn btn-sm btn-primary';
+       hlYes.className = 'btn btn-sm btn-secondary';
+       if (hlOther) hlOther.classList.add('hidden');
+     });
+   }
+
    // Bind form inputs
    const inputs = app.querySelectorAll('input, select, textarea');
    inputs.forEach(input => {
@@ -164,7 +185,7 @@
      <div class="option-grid" style="flex:1;">
        ${types.map(t => `
          <div class="option-card ${state.planType === t.key ? 'selected' : ''}"
-              data-name="planType" data-value="${t.key}" data-onselect="state.planType='${t.key}'">
+              data-name="planType" data-value="${t.key}">
            <div style="font-size:1.5rem;flex-shrink:0;">${t.icon}</div>
            <div class="option-content">
              <div class="option-title">${t.title}</div>
@@ -239,7 +260,7 @@
      <div class="option-grid" style="flex:1;">
        ${activities.map(a => `
          <div class="option-card ${state.activityLevel === a.key ? 'selected' : ''}"
-              data-name="activityLevel" data-value="${a.key}" data-onselect="state.activityLevel='${a.key}'">
+              data-name="activityLevel" data-value="${a.key}">
            <div class="option-content">
              <div class="option-title">${a.title}</div>
              <div class="option-desc">${a.desc}</div>
@@ -315,17 +336,17 @@
            </ul>
          </div>
        </div>
-       <div class="form-group" style="margin-top:16px;">
-         <label class="form-label">是否有需要说明的健康限制？</label>
-         <div style="display:flex;gap:12px;margin-bottom:8px;">
-           <button class="btn btn-sm ${state.hasHealthLimitation ? 'btn-primary' : 'btn-secondary'}"
-             onclick="state.hasHealthLimitation=true;this.className='btn btn-sm btn-primary';document.getElementById('hl-other').className='';document.getElementById('hl-no').className='btn btn-sm btn-secondary'">有</button>
-           <button class="btn btn-sm ${!state.hasHealthLimitation ? 'btn-primary' : 'btn-secondary'}"
-             onclick="state.hasHealthLimitation=false;this.className='btn btn-sm btn-primary';document.getElementById('hl-yes').className='btn btn-sm btn-secondary';document.getElementById('hl-other').className='hidden'" id="hl-no">无</button>
-         </div>
-         <textarea class="form-input ${state.hasHealthLimitation ? '' : 'hidden'}" id="hl-other"
-           placeholder="请简要说明你的健康情况..." data-bind="healthDescription">${state.healthDescription}</textarea>
-       </div>
+      <div class="form-group" style="margin-top:16px;">
+        <label class="form-label">是否有需要说明的健康限制？</label>
+        <div style="display:flex;gap:12px;margin-bottom:8px;">
+          <button class="btn btn-sm ${state.hasHealthLimitation ? 'btn-primary' : 'btn-secondary'}"
+            id="hl-yes">有</button>
+          <button class="btn btn-sm ${!state.hasHealthLimitation ? 'btn-primary' : 'btn-secondary'}"
+            id="hl-no">无</button>
+        </div>
+        <textarea class="form-input ${state.hasHealthLimitation ? '' : 'hidden'}" id="hl-other"
+          placeholder="请简要说明你的健康情况..." data-bind="healthDescription">${state.healthDescription}</textarea>
+      </div>
      </div>
      <div class="onboarding-actions">
        <div style="display:flex;gap:12px;">
@@ -340,12 +361,13 @@
    const plan = generateNutritionPlan(state);
    const stage = calculateStageTarget(state.currentWeight, state.targetWeight);
    const planTypeLabel = PLAN_TYPES[state.planType]?.label || '';
- 
-   // Save to database
-   setTimeout(async () => {
+
+   // Save to database immediately (no setTimeout delay)
+   state.onboardingCompleted = true;
+   window._onboardingSavePromise = (async () => {
      await saveUserProfile(state);
      await saveNutritionPlan(plan);
-   }, 100);
+   })();
  
    return `
      <div class="onboarding-title">你的方案已生成</div>
@@ -416,7 +438,7 @@
        </div>
      </div>
      <div class="onboarding-actions">
-       <button class="btn btn-primary btn-block btn-lg" onclick="window.navigate('/today')">开始使用</button>
+       <button class="btn btn-primary btn-block btn-lg" onclick="window._startUsing()">开始使用</button>
      </div>
    `;
  }
@@ -480,4 +502,17 @@
    }
  };
  
+ // Ensure onboarding data is saved before navigating to the app
+ window._startUsing = async () => {
+   try {
+     if (window._onboardingSavePromise) {
+       await window._onboardingSavePromise;
+     }
+   } catch (e) {
+     showToast('数据保存失败，请重试', 'error');
+     return;
+   }
+   navigate('/today');
+ };
+
  export default { render };

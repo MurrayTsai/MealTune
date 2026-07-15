@@ -191,9 +191,11 @@
  }
  
  // Format macronutrient percentage
- export function macroPercent(grams, calories) {
+ // type: 'protein' | 'carbs' (4 cal/g) or 'fat' (9 cal/g)
+ export function macroPercent(grams, calories, type = 'protein') {
    if (!calories || !grams) return 0;
-   const cal = grams * (grams === 'fat' ? 9 : 4);
+   const calPerGram = type === 'fat' ? 9 : 4;
+   const cal = grams * calPerGram;
    return Math.round((cal / calories) * 100);
  }
  
