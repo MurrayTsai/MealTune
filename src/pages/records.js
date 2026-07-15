@@ -9,7 +9,7 @@
  let currentMealType = '早餐';
  let currentFoods = [];
  let aiInputText = '';
- let isAIMode = true;
+ let hasRecognized = false;
  
  export async function render(params, path) {
    const app = document.getElementById('app');
@@ -22,121 +22,118 @@
  
    const meals = await getMealRecords(currentDate);
  
-   const content = `
-     <div class="fade-in">
-       <!-- Date Selector -->
-       <div class="day-selector">
-         <button onclick="changeRecordDate(-1)">&lt;</button>
-         <div class="date-label">${formatDate(currentDate)}</div>
-         <button onclick="changeRecordDate(1)">&gt;</button>
-       </div>
- 
-       <!-- Meal Type Tabs -->
-       <div class="tabs" id="meal-type-tabs">
-         ${['早餐', '午餐', '晚餐', '加餐'].map(t =>
-           `<div class="tab ${currentMealType === t ? 'active' : ''}" onclick="setMealType('${t}')">${t}</div>`
-         ).join('')}
-       </div>
- 
-       <!-- Existing meals today -->
-       ${meals.length > 0 ? `
-         <div style="margin-bottom:12px;">
-           <div style="font-size:0.8125rem;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">今日餐食记录</div>
-           ${meals.map(meal => {
-             const total = calculateMealTotals(meal.foods || []);
-             const icons = { '早餐': '🌅', '午餐': '☀️', '晚餐': '🌙', '加餐': '🍪' };
-             return `
-               <div class="meal-card">
-                 <div class="meal-header" onclick="this.nextElementSibling.classList.toggle('hidden')">
-                   <div class="meal-header-left">
-                     <span>${icons[meal.mealType] || '🍽️'}</span>
-                     <span>${meal.mealType}</span>
-                   </div>
-                   <div class="meal-header-right">
-                     <span>${total.calories} kcal</span>
-                     <span class="text-xs" style="cursor:pointer;color:var(--danger);" onclick="event.stopPropagation();deleteMealConfirm(${meal.id})">删除</span>
-                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                   </div>
-                 </div>
-                 <div class="meal-body hidden">
-                   ${(meal.foods || []).map(f => `
-                     <div class="food-item">
-                       <span class="food-name">${f.foodName}</span>
-                       <span class="food-amount">${f.weight}g</span>
-                       <span class="food-cal">${f.calories} kcal</span>
-                     </div>
-                   `).join('')}
-                 </div>
-               </div>
-             `;
-           }).join('')}
-         </div>
-       ` : ''}
- 
-       <!-- Input Mode -->
-       <div style="display:flex;gap:8px;margin-bottom:12px;">
-         <button class="btn btn-sm ${isAIMode ? 'btn-primary' : 'btn-secondary'}" onclick="toggleInputMode(true)">AI 输入</button>
-         <button class="btn btn-sm ${!isAIMode ? 'btn-primary' : 'btn-secondary'}" onclick="toggleInputMode(false)">手动选择</button>
-       </div>
- 
-       <!-- AI Input Area -->
-       <div id="ai-input-section" class="${isAIMode ? '' : 'hidden'}">
-         <div class="ai-input-area">
-           <div class="ai-input-label">📝 用自然语言描述你的餐食</div>
-           <div class="ai-input">
-             <textarea id="ai-text-input" rows="3" placeholder="例如：吃了一碗米饭，一份鸡胸肉，一份西兰花&#10;或者：中午吃了一碗面条和一个鸡蛋">${aiInputText}</textarea>
-           </div>
-           <div class="ai-hint">支持中英文输入，AI会自动识别食物并估算营养</div>
-           <button class="btn btn-primary btn-block btn-sm" style="margin-top:8px;" onclick="parseAIText()">
-             <span id="ai-parse-btn-text">🤖 AI 识别</span>
-             <span id="ai-spinner" class="hidden spinner" style="width:16px;height:16px;border-width:2px;margin:0;"></span>
-           </button>
-         </div>
-       </div>
- 
-       <!-- Manual Input Area -->
-       <div id="manual-input-section" class="${isAIMode ? 'hidden' : ''}">
-         <div class="card">
-           <div class="card-header">选择食物</div>
-           <div class="form-group">
-             <input class="form-input" id="food-search" type="text" placeholder="搜索食物名称..." oninput="searchFood()" />
-           </div>
-           <div id="search-results" style="max-height:200px;overflow-y:auto;"></div>
-         </div>
-         <div id="manual-foods" class="card">
-           <div class="card-header">已添加食物</div>
-           <div id="selected-foods-list">
-             ${currentFoods.length === 0 ? '<div class="text-sm text-secondary">还没有选择食物</div>' : ''}
-           </div>
-         </div>
-       </div>
- 
-       <!-- Current AI parsed foods -->
-       <div id="parsed-foods-section" class="${isAIMode && currentFoods.length > 0 ? '' : 'hidden'}">
-         <div class="card">
-           <div class="card-header">已识别食物</div>
-           <div id="parsed-foods-list">
-             ${currentFoods.map((f, i) => `
-               <div class="food-item">
-                 <span class="food-name">${f.foodName}</span>
-                 <span class="food-amount">
-                   <input type="number" value="${f.weight}" min="1" style="width:60px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;font-size:0.8125rem;text-align:center;"
-                     onchange="updateFoodWeight(${i}, this.value)" /> g
-                 </span>
-                 <span class="food-cal">${f.calories} kcal</span>
-                 <span class="text-xs" style="cursor:pointer;color:var(--danger);margin-left:4px;" onclick="removeParsedFood(${i})">✕</span>
-               </div>
-             `).join('')}
-           </div>
-         </div>
-       </div>
- 
-       <!-- Save Button -->
-       <button class="btn btn-primary btn-block btn-lg" id="save-meal-btn" onclick="saveMeal()">
-         <span id="save-meal-text">保存餐食</span>
-       </button>
-     </div>
-   `;
+   ﻿const content = `
+    <div class="fade-in">
+      <!-- Date Selector -->
+      <div class="day-selector">
+        <button onclick="changeRecordDate(-1)">&lt;</button>
+        <div class="date-label">${formatDate(currentDate)}</div>
+        <button onclick="changeRecordDate(1)">&gt;</button>
+      </div>
+
+      <!-- Meal Type Tabs -->
+      <div class="tabs" id="meal-type-tabs">
+        ${['早餐', '午餐', '晚餐', '加餐'].map(t =>
+          `<div class="tab ${currentMealType === t ? 'active' : ''}" onclick="setMealType('${t}')">${t}</div>`
+        ).join('')}
+      </div>
+
+      <!-- Step Progress -->
+      <div style="display:flex;gap:6px;margin-bottom:12px;padding:0 4px;">
+        <div style="flex:1;text-align:center;padding:6px 0;border-radius:6px;font-size:0.75rem;font-weight:600;${!hasRecognized ? 'background:var(--green);color:white;' : 'background:var(--green-bg);color:var(--green);'}">1. 描述食物</div>
+        <div style="flex:1;text-align:center;padding:6px 0;border-radius:6px;font-size:0.75rem;font-weight:600;${hasRecognized ? 'background:var(--green);color:white;' : 'background:var(--border);color:var(--text-muted);'}">2. 确认结果</div>
+        <div style="flex:1;text-align:center;padding:6px 0;border-radius:6px;font-size:0.75rem;font-weight:600;${hasRecognized && currentFoods.length > 0 ? 'background:var(--green);color:white;' : 'background:var(--border);color:var(--text-muted);'}">3. 保存</div>
+      </div>
+
+      <!-- Existing meals today -->
+      ${meals.length > 0 ? `
+        <div style="margin-bottom:12px;">
+          <div style="font-size:0.8125rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">已记录的餐食</div>
+          ${meals.map(meal => {
+            const total = calculateMealTotals(meal.foods || []);
+            const icons = { '早餐': '\u{1F305}', '午餐': '\u2600\uFE0F', '晚餐': '\u{1F319}', '加餐': '\u{1F36A}' };
+            return `
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:var(--bg);border-radius:6px;margin-bottom:4px;font-size:0.8125rem;">
+                <span>${icons[meal.mealType] || '\u{1F37D}\uFE0F'} ${meal.mealType} - ${total.calories} kcal</span>
+                <span class="text-xs" style="cursor:pointer;color:var(--danger);" onclick="deleteMealConfirm(${meal.id})">删除</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : ''}
+
+      <!-- Step 1: Describe food (always visible) -->
+      <div>
+        <div style="font-size:0.8125rem;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">用自然语言描述这餐吃了什么</div>
+        <div class="ai-input-area" style="margin-bottom:0;">
+          <div class="ai-input">
+            <textarea id="ai-text-input" rows="2" placeholder="例如：吃了200克米饭、150克鸡胸肉、100克西兰花&#10;或者：一碗面条加一个鸡蛋，一杯牛奶" style="font-size:0.9375rem;">${aiInputText}</textarea>
+          </div>
+          <div class="ai-hint">推荐包含食物名称和份量，如"200克米饭"、"半斤牛肉"</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button class="btn btn-primary btn-block btn-sm" style="margin-top:0;" onclick="parseAIText()">
+            <span id="ai-parse-btn-text">识别食物</span>
+            <span id="ai-spinner" class="hidden spinner" style="width:16px;height:16px;border-width:2px;margin:0;"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2 + 3: Results after recognition -->
+      ${hasRecognized ? `
+        <div style="margin-top:12px;">
+          <div style="font-size:0.8125rem;font-weight:600;color:var(--green);margin-bottom:8px;">已识别食物 编辑重量后确认</div>
+          <div class="card" style="padding:12px;">
+            ${currentFoods.length === 0 ? '<div class="text-sm text-secondary text-center" style="padding:8px 0;">未识别到食物，可修改描述后重试</div>' : ''}
+            ${currentFoods.map((f, i) => `
+              <div class="food-item">
+                <span class="food-name" style="font-weight:500;">${f.foodName}</span>
+                <span class="food-amount">
+                  <input type="number" value="${f.weight}" min="1" step="10" style="width:55px;padding:3px 4px;border:1px solid var(--border);border-radius:4px;font-size:0.8125rem;text-align:center;" onchange="updateFoodWeight(${i}, this.value)" /> g
+                </span>
+                <span class="food-cal">${f.calories} <span class="text-xs text-secondary">kcal</span></span>
+                <span class="text-xs" style="cursor:pointer;color:var(--danger);margin-left:4px;padding:4px;" onclick="removeParsedFood(${i})">X</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <!-- Nutrition preview -->
+          ${currentFoods.length > 0 ? `
+          <div class="card" style="margin-top:8px;background:var(--green-bg);padding:12px;">
+            <div style="font-size:0.75rem;font-weight:600;color:var(--green);margin-bottom:6px;">本餐营养小计（保存前预览）</div>
+            <div class="stat-row" style="gap:4px;">
+              <div class="stat-item" style="padding:8px 6px;"><div class="stat-value" style="font-size:1rem;">${Math.round(currentFoods.reduce((s,fi) => s+(fi.calories||0), 0))}</div><div class="stat-label" style="font-size:0.6875rem;">千卡</div></div>
+              <div class="stat-item" style="padding:8px 6px;"><div class="stat-value" style="font-size:1rem;color:var(--blue);">${Math.round(currentFoods.reduce((s,fi) => s+(fi.protein||0), 0)*10)/10}g</div><div class="stat-label" style="font-size:0.6875rem;">蛋白质</div></div>
+              <div class="stat-item" style="padding:8px 6px;"><div class="stat-value" style="font-size:1rem;color:var(--orange);">${Math.round(currentFoods.reduce((s,fi) => s+(fi.carbs||0), 0)*10)/10}g</div><div class="stat-label" style="font-size:0.6875rem;">碳水</div></div>
+              <div class="stat-item" style="padding:8px 6px;"><div class="stat-value" style="font-size:1rem;color:var(--warning);">${Math.round(currentFoods.reduce((s,fi) => s+(fi.fat||0), 0)*10)/10}g</div><div class="stat-label" style="font-size:0.6875rem;">脂肪</div></div>
+            </div>
+          </div>
+          ` : ''}
+
+          <!-- Manual supplement -->
+          <div class="card" style="margin-top:8px;">
+            <div class="card-header">手动补充</div>
+            <div class="form-group" style="margin-bottom:8px;">
+              <input class="form-input" id="food-search" type="text" placeholder="搜索食物..." oninput="searchFood()" />
+            </div>
+            <div id="search-results" style="max-height:150px;overflow-y:auto;"></div>
+            <div style="margin-top:8px;">
+              <button class="btn btn-sm btn-secondary btn-block" onclick="reRecognize()">返回重新描述</button>
+            </div>
+          </div>
+
+          <!-- Save button (only when foods exist) -->
+          ${currentFoods.length > 0 ? `
+          <button class="btn btn-primary btn-block btn-lg" style="margin-top:12px;" onclick="saveMeal()">
+            确认并保存餐食
+          </button>
+          ` : ''}
+        </div>
+      ` : ''}
+
+    </div>
+  `
+;
  
    const html = pageWrapper(content, { title: '记录餐食', showBack: true, backPath: '/today' });
    app.innerHTML = html;
@@ -148,7 +145,7 @@
      currentDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
      currentFoods = [];
      aiInputText = '';
-     isAIMode = true;
+     hasRecognized = false;
      await render({ date: currentDate });
    };
  
@@ -192,7 +189,13 @@
      }
    };
  
-   window.saveMeal = async () => {
+   window.reRecognize = () => {
+    currentFoods = [];
+    hasRecognized = false;
+    render({ date: currentDate });
+  };
+
+  window.saveMeal = async () => {
      if (currentFoods.length === 0) {
        showToast('请先添加食物', 'warning');
        return;
