@@ -1,0 +1,23 @@
+ {
+   "name": "MealTune",
+   "short_name": "MealTune",
+   "description": "你的智能饮食健康助手",
+   "start_url": "/",
+   "display": "standalone",
+   "background_color": "#F7F5F0",
+   "theme_color": "#4F7C3F",
+   "orientation": "portrait-primary",
+   "icons": [
+     {
+       "src": "/icons/icon-192.png",
+       "sizes": "192x192",
+       "type": "image/png"
+     },
+     {
+       "src": "/icons/icon-512.png",
+       "sizes": "512x512",
+       "type": "image/png",
+       "purpose": "any maskable"
+     }
+   ]
+ }

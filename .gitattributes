@@ -1,0 +1,17 @@
+ # Auto detect text files
+ * text=auto
+ 
+ # Source files
+ *.js text
+ *.css text
+ *.html text
+ *.json text
+ *.yml text
+ *.yaml text
+ *.md text
+ *.sh text
+ 
+ # Binary files
+ *.png binary
+ *.svg text
+ *.ico binary
